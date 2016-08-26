@@ -1,0 +1,2 @@
+# GQResign
+ipa重签名(resign),只需一个证书的p12和一个mobileprovision文件就可以实现ipa的重签名
