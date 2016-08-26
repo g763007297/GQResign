@@ -1,5 +1,7 @@
 #!/bin/bash
 #code by cs gq
+
+#configure
 logFile="log.txt"
 #工作区域sub文件夹
 workSpace="/workSpace"
@@ -13,6 +15,20 @@ outputFile=""
 hiddenWorkspace=1
 #是否删除工作目录 非debug模式删除工作目录以及隐藏工作目录
 Debug=0
+
+#error define
+GQImporP12Fail="导入证书失败"
+GQTooManyIpa="该文件夹中包含多个ipa，请只放置一个需重签名的ipa"
+GQTooManyProvisitionFile="该文件夹中包含多个provisitionFile，请只放置一个需重签名的provisitionFile"
+GQEntitlementsDealFail="Entitlements处理失败"
+GQCerMatchProvisitionFail="所选证书与provisionfile的group不匹配"
+GQUnZipFail="解压ipa失败"
+GQCopyFail="拷贝失败"
+GQFileLost="文件不存在"
+GQChangePlistFail="修改info.plist失败"
+GQSignFail="签名失败"
+GQVerifySignFail="验证签名完整性失败"
+GQZipAppFail="压缩app失败"
 
 function msgActionShow()
 {
@@ -56,7 +72,7 @@ function fileCheck()
 {
     local file="$1"
     if ! ([ -f "$file" ]); then
-        quitProgram "\""$file "\"文件不存在"
+        quitProgram "$file ""$GQFileLost"
     fi
 }
 function createWorkSpace()
@@ -180,7 +196,7 @@ then
 else
 #导入证书
     (security import $p12File -k ./login.keychain -P '' -T /usr/bin/codesign >> "$logFile" 2>&1)||{
-        quitProgram "导入证书失败"
+        quitProgram "$GQImporP12Fail"
     }
     inputFlag=0
 fi
@@ -214,13 +230,13 @@ done
 ipaFile=$(getAppointFile "$currentDir" "ipa")
 if !([ -e "$ipaFile" ])
 then
-    quitProgram "该文件夹中包含多个ipa，请只放置一个需重签名的ipa"
+    quitProgram "$GQTooManyIpa"
 fi
 
 provisitionFile=$(getAppointFile "$currentDir" "mobileprovision")
 if !([ -e "$provisitionFile" ])
 then
-    quitProgram "该文件夹中包含多个provisitionFile，请只放置一个需重签名的provisitionFile"
+    quitProgram "$GQTooManyProvisitionFile"
 fi
 
 # 1.文件验证
@@ -239,7 +255,7 @@ entitlementsPlist="$workSpaceFile"entitlements.plist
 # defaults write ${entitlementsPlist} ${tmpDict}
 # /usr/libexec/PlistBuddy -c "Set :dict ${tmpDict}" $entitlementsPlist
 (/usr/libexec/PlistBuddy -x -c "print :Entitlements " /dev/stdin <<< $(security cms -D -i "$workSpaceProvisionFile") > "$entitlementsPlist") || {
-    quitProgram "Entitlements处理失败"
+    quitProgram "$GQEntitlementsDealFail"
 }
 msgSucessShow "Entitlements处理成功"
 
@@ -264,7 +280,7 @@ then
     msgWarningShow "所选证书与provisionfile的group不匹配，是否继续？继续请按1"
     read -p "Enter your choice:"
     if [[ -z $REPLY || "$REPLY" != "1" ]]; then
-        quitProgram "所选证书与provisionfile的group不匹配"
+        quitProgram "$GQCerMatchProvisitionFail"
     fi
 fi
 msgSucessShow "验证匹配性成功"
@@ -272,7 +288,7 @@ msgSucessShow "验证匹配性成功"
 # 5.解压
 msgActionShow "5.======解压ipa开始======"
 (unzip -d "$workSpaceFile" "$workSpaceIpaFile" >> "$logFile" 2>&1 ) || {
-    quitProgram \""$workSpaceIpaFile"\"解压ipa失败
+    quitProgram "$workSpaceIpaFile""$GQUnZipFail"
 }
 msgSucessShow "解压ipa成功"
 
@@ -280,7 +296,7 @@ msgSucessShow "解压ipa成功"
 msgActionShow "6.======拷贝""$workSpaceProvisionFile""-->""$workSpaceFile""Payload/*.app/embedded.mobileprovision开始======"
 #rm -rf Payload/*.app/_CodeSignature/
 (cp "$workSpaceProvisionFile" "$workSpaceFile"Payload/*.app/embedded.mobileprovision >> "$logFile" 2>&1) || {
-    quitProgram \""$workSpaceProvisionFile"\"拷贝失败
+    quitProgram "$workSpaceProvisionFile""$GQCopyFail"
 }
 msgSucessShow "拷贝mobileprovision文件开始成功"
 
@@ -288,11 +304,11 @@ msgSucessShow "拷贝mobileprovision文件开始成功"
 msgActionShow "7.======修改info.plist开始======"
 if !([ -e "$workSpaceFile"Payload/*.app/info.plist ])
 then
-    quitProgram "$infoPlist""文件不存在"
+    quitProgram "$infoPlist""$GQFileLost"
 fi
 
 (/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${bundleId}" "$workSpaceFile"Payload/*.app/info.plist >> "$logFile" 2>&1)||{
-    quitProgram "修改info.plist失败"
+    quitProgram "$GQChangePlistFail"
 }
 msgSucessShow "修改info.plist成功"
 
@@ -306,14 +322,14 @@ appName=$(getAppointFile "$payloadPath" "app")
 #拼接app的目录路径
 appPath="$workSpaceFile""Payload""/""$appName"
 (codesign -fs "${distributionCer}" --no-strict --entitlements="$entitlementsPlist" "$appPath" >> "$logFile" 2>&1) || {
-    quitProgram "签名失败"
+    quitProgram "$GQSignFail"
 }
 msgSucessShow "签名成功"
 
 # 9.验证文件是否签名完整
 msgActionShow "9.======验证签名完整性开始======"
 (codesign -v "$appPath" >> "$logFile" 2>&1)||{
-    quitProgram "验证签名完整性失败"
+    quitProgram "$GQVerifySignFail"
 }
 msgSucessShow "验证签名完整性成功"
 
@@ -327,7 +343,7 @@ zipIpaFile="$outputFile""/"$temp"_resign.ipa"
 
 (zip -r "$zipIpaFile" Payload/ > /dev/null) || {
     cd ..
-    quitProgram "压缩app失败"
+    quitProgram "$GQZipAppFail"
 }
 cd ..
 
