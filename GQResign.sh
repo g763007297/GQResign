@@ -2,9 +2,16 @@
 #code by cs gq
 
 #configure
+#脚本存放目录
+currentBashDir=""
+#日志文件
 logFile="log.txt"
 #工作区域sub文件夹
 workSpace="/workSpace"
+#工作目录
+workSpaceFile=""
+#解压后app存放目录
+unzipAppSpace="unzipIpa"
 #工作区域ipa存放地址
 workSpaceIpaFile=""
 #工作区域ProvisionFile存放地址
@@ -77,7 +84,7 @@ function fileCheck()
 }
 function createWorkSpace()
 {
-    currentFile=`pwd`
+    local currentFile=`pwd`
     workSpaceFile="$currentFile"$workSpace"/"
     outputFile=`pwd`"/output"
 
@@ -97,6 +104,9 @@ function createWorkSpace()
             fi
         fi
     }
+
+    mkdir "$workSpaceFile""$unzipAppSpace"   
+    unzipAppSpace="$workSpaceFile""$unzipAppSpace"/
 
     #判断输出文件夹是否存在 不存在就创建
     if ! ([ -d "$outputFile" ])
@@ -153,8 +163,8 @@ function getAppointFile()
 }
 
 #获取脚本文件目录
-currentDir=$(cd "$(dirname "${BASH_SOURCE-$0}")"; pwd)
-cd "$currentDir"
+currentBashDir=$(cd "$(dirname "${BASH_SOURCE-$0}")"; pwd)
+cd "$currentBashDir"
 
 clear
 # ================================================
@@ -181,7 +191,7 @@ fi
 
 echo "===================="`date +%Y年%m月%d日`"====================" >> "$logFile"
 ######################项目参数配置
-p12File=$(getAppointFile "$currentDir" "p12")
+p12File=$(getAppointFile "$currentBashDir" "p12")
 
 #提取P12文件中得证书名
 if [ -n "$p12File" ]
@@ -227,13 +237,13 @@ done
 
 # 获取当前目录
 # "$currentDir""/"
-ipaFile=$(getAppointFile "$currentDir" "ipa")
+ipaFile=$(getAppointFile "$currentBashDir" "ipa")
 if !([ -e "$ipaFile" ])
 then
     quitProgram "$GQTooManyIpa"
 fi
 
-provisitionFile=$(getAppointFile "$currentDir" "mobileprovision")
+provisitionFile=$(getAppointFile "$currentBashDir" "mobileprovision")
 if !([ -e "$provisitionFile" ])
 then
     quitProgram "$GQTooManyProvisitionFile"
@@ -250,7 +260,7 @@ createWorkSpace "$ipaFile" "$provisitionFile"
 
 # 2.解析成需要的entitlements.plist
 msgActionShow "2.======处理entitlements开始======"
-entitlementsPlist="$workSpaceFile"entitlements.plist
+entitlementsPlist="$unzipAppSpace/"entitlements.plist
 
 # defaults write ${entitlementsPlist} ${tmpDict}
 # /usr/libexec/PlistBuddy -c "Set :dict ${tmpDict}" $entitlementsPlist
@@ -269,12 +279,10 @@ then
 fi
 
 # 4.匹配provisionfile与证书  distribution的证书需要匹配，development的证书不需要匹配，因为如果是个人加到group中证书的group肯定不匹配，
-
 msgActionShow "4.======开始验证provisionfile与证书是否匹配开始======"
 cerType=`componentsSeparatedByString "$distributionCer"`
 provisionFileTeamId=${applicationIdentifier%%.*}
 cerTeamId=${distributionCer##*\(}
-test $cerTeamId = "$provisionFileTeamId"\)""
 if [[ "$cerTeamId" != "$provisionFileTeamId"\)"" && "$cerType" != "Developer:" ]] 
 then
     msgWarningShow "所选证书与provisionfile的group不匹配，是否继续？继续请按1"
@@ -287,27 +295,27 @@ msgSucessShow "验证匹配性成功"
 
 # 5.解压
 msgActionShow "5.======解压ipa开始======"
-(unzip -d "$workSpaceFile" "$workSpaceIpaFile" >> "$logFile" 2>&1 ) || {
+(unzip -d "$unzipAppSpace" "$workSpaceIpaFile" >> "$logFile" 2>&1 ) || {
     quitProgram "$workSpaceIpaFile""$GQUnZipFail"
 }
 msgSucessShow "解压ipa成功"
 
 # 6.拷贝provisitionFile
-msgActionShow "6.======拷贝""$workSpaceProvisionFile""-->""$workSpaceFile""Payload/*.app/embedded.mobileprovision开始======"
+msgActionShow "6.======拷贝""$workSpaceProvisionFile""-->""$unzipAppSpace""Payload/*.app/embedded.mobileprovision开始======"
 #rm -rf Payload/*.app/_CodeSignature/
-(cp "$workSpaceProvisionFile" "$workSpaceFile"Payload/*.app/embedded.mobileprovision >> "$logFile" 2>&1) || {
+(cp "$workSpaceProvisionFile" "$unzipAppSpace"Payload/*.app/embedded.mobileprovision >> "$logFile" 2>&1) || {
     quitProgram "$workSpaceProvisionFile""$GQCopyFail"
 }
 msgSucessShow "拷贝mobileprovision文件开始成功"
 
 # 7.修改info.plist
 msgActionShow "7.======修改info.plist开始======"
-if !([ -e "$workSpaceFile"Payload/*.app/info.plist ])
+if !([ -e "$unzipAppSpace"Payload/*.app/info.plist ])
 then
     quitProgram "$infoPlist""$GQFileLost"
 fi
 
-(/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${bundleId}" "$workSpaceFile"Payload/*.app/info.plist >> "$logFile" 2>&1)||{
+(/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${bundleId}" "$unzipAppSpace"Payload/*.app/info.plist >> "$logFile" 2>&1)||{
     quitProgram "$GQChangePlistFail"
 }
 msgSucessShow "修改info.plist成功"
@@ -316,11 +324,11 @@ msgSucessShow "修改info.plist成功"
 msgActionShow "8.======签名开始======"
 
 #payload路径拼接
-payloadPath="$workSpaceFile"Payload
+payloadPath="$unzipAppSpace"Payload
 #获取app文件名
 appName=$(getAppointFile "$payloadPath" "app")
 #拼接app的目录路径
-appPath="$workSpaceFile""Payload""/""$appName"
+appPath="$unzipAppSpace""Payload""/""$appName"
 (codesign -fs "${distributionCer}" --no-strict --entitlements="$entitlementsPlist" "$appPath" >> "$logFile" 2>&1) || {
     quitProgram "$GQSignFail"
 }
@@ -335,17 +343,17 @@ msgSucessShow "验证签名完整性成功"
 
 # 10.压缩app文件
 msgActionShow "10.======压缩app开始======"
-cd "$workSpaceFile"
+cd "$unzipAppSpace"
 #获取app的名称
 temp=${appName%.*}
 #拼接输出文件
 zipIpaFile="$outputFile""/"$temp"_resign.ipa"
 
-(zip -r "$zipIpaFile" Payload/ > /dev/null) || {
-    cd ..
+(zip -qry "$zipIpaFile" -qry *) || {
+    cd "$currentBashDir"
     quitProgram "$GQZipAppFail"
 }
-cd ..
+cd "$currentBashDir"
 
 msgSucessShow "压缩app成功"
 msgSucessShow "文件重签名ok了，赶快去试试吧"
