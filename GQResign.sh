@@ -39,12 +39,12 @@ GQZipAppFail="压缩app失败"
 
 function msgActionShow()
 {
-	echo -e "\033[42;37m[执行]$1\033[0m"
+    echo -e "\033[42;37m[执行]$1\033[0m"
     echo `date +%H:%M:%S.%s`"[执行]$1" >> "$logFile"
 }
 function msgErrorShow()
 {
-	echo -e "\033[31m[出错]$1\033[0m"
+    echo -e "\033[31m[出错]$1\033[0m"
     echo `date +%H:%M:%S.%s`"[出错]$1" >> "$logFile"
 }
 function msgSucessShow()
@@ -300,10 +300,17 @@ msgActionShow "5.======解压ipa开始======"
 }
 msgSucessShow "解压ipa成功"
 
+#payload路径拼接
+payloadPath="$unzipAppSpace"Payload
+#获取app文件名
+appFileName=$(getAppointFile "$payloadPath" "app")
+#获取app的名称
+appName=${appFileName%.*}
+
 # 6.拷贝provisitionFile
 msgActionShow "6.======拷贝""$workSpaceProvisionFile""-->""$unzipAppSpace""Payload/*.app/embedded.mobileprovision开始======"
 #rm -rf Payload/*.app/_CodeSignature/
-(cp "$workSpaceProvisionFile" "$unzipAppSpace"Payload/*.app/embedded.mobileprovision >> "$logFile" 2>&1) || {
+(cp "$workSpaceProvisionFile" "$unzipAppSpace"Payload/"$appName".app/embedded.mobileprovision >> "$logFile" 2>&1) || {
     quitProgram "$workSpaceProvisionFile""$GQCopyFail"
 }
 msgSucessShow "拷贝mobileprovision文件开始成功"
@@ -323,12 +330,8 @@ msgSucessShow "修改info.plist成功"
 # 8.开始签名
 msgActionShow "8.======签名开始======"
 
-#payload路径拼接
-payloadPath="$unzipAppSpace"Payload
-#获取app文件名
-appName=$(getAppointFile "$payloadPath" "app")
 #拼接app的目录路径
-appPath="$unzipAppSpace""Payload""/""$appName"
+appPath="$unzipAppSpace""Payload""/""$appFileName"
 (codesign -fs "${distributionCer}" --no-strict --entitlements="$entitlementsPlist" "$appPath" >> "$logFile" 2>&1) || {
     quitProgram "$GQSignFail"
 }
@@ -344,10 +347,8 @@ msgSucessShow "验证签名完整性成功"
 # 10.压缩app文件
 msgActionShow "10.======压缩app开始======"
 cd "$unzipAppSpace"
-#获取app的名称
-temp=${appName%.*}
 #拼接输出文件
-zipIpaFile="$outputFile""/"$temp"_resign.ipa"
+zipIpaFile="$outputFile""/"$appName"_resign.ipa"
 
 (zip -qry "$zipIpaFile" -qry *) || {
     cd "$currentBashDir"
