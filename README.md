@@ -4,11 +4,13 @@ ipa重签名(resign),只需一个证书的p12和一个mobileprovision文件就�
 ##（1）使用规则
 ###1.将GQResign.sh与你的mobileprovision文件和ipa文件放在同一个文件夹内。
 
-###2.打开命令行，复制 chmod +x ,再将GQResign.sh拖入命令行里面，回车。
+###2.打开命令行，复制 chmod +x ,再敲一个空格,再将GQResign.sh拖入命令行里面，回车。
 
 ###3.继续将GQResign.sh拖入命令行内，回车，将会出现证书选择项，选择与你mobileprovision文件相匹配的证书，回车。
 
-###4.等待数秒钟(视你的ipa资源文件的多少而定)。最后在output文件中就可以找到重签名成功地ipa
+###4.等待数秒钟(视你的ipa资源文件的多少而定)。最后在output文件中就可以找到重签名成功地ipa。
+
+###5.安装，完美！  ！_ ！
 
 ##（2）工程配置选项
 
