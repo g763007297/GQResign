@@ -260,7 +260,7 @@ createWorkSpace "$ipaFile" "$provisitionFile"
 
 # 2.解析成需要的entitlements.plist
 msgActionShow "2.======处理entitlements开始======"
-entitlementsPlist="$workSpaceFile/"entitlements.plist
+entitlementsPlist="$workSpaceFile"entitlements.plist
 
 # defaults write ${entitlementsPlist} ${tmpDict}
 # /usr/libexec/PlistBuddy -c "Set :dict ${tmpDict}" $entitlementsPlist
