@@ -39,7 +39,7 @@ GQZipAppFail="压缩app失败"
 
 function msgActionShow()
 {
-    echo -e "\033[42;37m[执行]$1\033[0m"
+    echo -e "\033[32m[执行]$1\033[0m"
     echo `date +%H:%M:%S.%s`"[执行]$1" >> "$logFile"
 }
 function msgErrorShow()
@@ -49,7 +49,7 @@ function msgErrorShow()
 }
 function msgSucessShow()
 {
-    echo -e "\033[32m[成功]$1\033[0m"
+    echo -e "\033[42;37m[成功]$1\033[0m"
     echo `date +%H:%M:%S.%s`"[成功]$1" >> "$logFile"
 }
 function msgWarningShow()
@@ -315,6 +315,21 @@ msgActionShow "6.======拷贝""$workSpaceProvisionFile""-->""$unzipAppSpace""Pay
 }
 msgSucessShow "拷贝mobileprovision文件开始成功"
 
+#拼接app的目录路径
+appPath="$unzipAppSpace""Payload""/""$appFileName"
+
+# List of plist keys used for reference to and from nested apps and extensions
+NESTED_APP_REFERENCE_KEYS=(":WKCompanionAppBundleIdentifier" ":NSExtension:NSExtensionAttributes:WKAppBundleIdentifier")
+
+for key in "${NESTED_APP_REFERENCE_KEYS[@]}"; do
+# Check if Info.plist has a reference to another app or extension
+    REF_BUNDLE_ID=$(PlistBuddy -c "Print ${key}" "$appPath/Info.plist" 2>/dev/null)
+    if [ -n "$REF_BUNDLE_ID" ];
+    then
+        PlistBuddy -c "Set ${key} $bundleId" "$appPath/Info.plist"
+    fi
+done
+
 # 7.修改info.plist
 msgActionShow "7.======修改info.plist开始======"
 if !([ -e "$unzipAppSpace"Payload/*.app/info.plist ])
@@ -330,8 +345,51 @@ msgSucessShow "修改info.plist成功"
 # 8.开始签名
 msgActionShow "8.======签名开始======"
 
-#拼接app的目录路径
-appPath="$unzipAppSpace""Payload""/""$appFileName"
+msgActionShow "8.1======剔除entitlementsPlist里面的黑字段======"
+
+# Update in https://github.com/facebook/buck/commit/99c0fbc3ab5ecf04d186913374f660683deccdef
+# Update in https://github.com/facebook/buck/commit/36db188da9f6acbb9df419dc1904315ab00c4e19
+
+BLACKLISTED_KEYS=(\
+    "com.apple.developer.icloud-container-development-container-identifiers" \
+    "com.apple.developer.icloud-container-environment" \
+    "com.apple.developer.icloud-container-identifiers" \
+    "com.apple.developer.icloud-services" \
+    "com.apple.developer.restricted-resource-mode" \
+    "com.apple.developer.ubiquity-container-identifiers" \
+    "com.apple.developer.ubiquity-kvstore-identifier" \
+    "inter-app-audio" \
+    "com.apple.developer.homekit" \
+    "com.apple.developer.healthkit" \
+    "com.apple.developer.in-app-payments" \
+    "com.apple.developer.maps" \
+    "com.apple.external-accessory.wireless-configuration"
+)
+
+for KEY in "${BLACKLISTED_KEYS[@]}"; do
+    PlistBuddy -c "Delete $KEY" "$entitlementsPlist" 2>/dev/null
+done
+
+msgActionShow "8.2======Frameworks签名开始======"
+
+resignPaths=`find "$appPath" -d -name *.app -o -name *.framework -o -name *.dylib -o -name *.appex -o -name *.so -o -name *.o -o -name *.vis -o -name *.pvr -o -name *.egg -o -name *.0`
+IFS=$(echo -en "\n\b")
+for bundle_item in ${resignPaths}
+do
+    if ([ -e "$bundle_item" ])
+    then
+        msgActionShow "$bundle_item 签名开始"
+        (codesign -fs "${distributionCer}" --no-strict --entitlements="$entitlementsPlist" "$bundle_item" >> "$logFile" 2>&1) || {
+            quitProgram "$GQSignFail"
+        }
+        (codesign -v "$bundle_item" >> "$logFile" 2>&1)||{
+            quitProgram "$GQVerifySignFail"
+        }
+    fi
+done
+
+msgActionShow "8.3======App签名开始======"
+
 (codesign -fs "${distributionCer}" --no-strict --entitlements="$entitlementsPlist" "$appPath" >> "$logFile" 2>&1) || {
     quitProgram "$GQSignFail"
 }
