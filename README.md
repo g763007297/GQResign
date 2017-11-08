@@ -1,7 +1,7 @@
 # GQResign
 ipa重签名(resign),只需一个证书的p12和一个mobileprovision文件就可以实现ipa的重签名
 
-##（1）使用规则
+## (1)使用规则
 
 ### 1.将GQResign.sh与你的mobileprovision文件和ipa文件放在同一个文件夹内。
 
@@ -13,17 +13,17 @@ ipa重签名(resign),只需一个证书的p12和一个mobileprovision文件就�
 
 ### 5.安装，完美！  ！_ ！
 
-##（2）工程配置选项
+## (2)工程配置选项
 
 ### 1.打开GQResign.sh 在头部有：
 
-1.hiddenWorkspace:是否隐藏工作目录，默认设置1为隐藏。
+1).hiddenWorkspace:是否隐藏工作目录，默认设置1为隐藏。
 
-2.Debug:测试模式；功能有：debug模式不会删除工作目录，也不会隐藏工作目录。
+2).Debug:测试模式；功能有：debug模式不会删除工作目录，也不会隐藏工作目录。
 
-3.日志文件:在GQResign.sh同一目录下地log.txt，里面有详细的日志输出。
+3).日志文件:在GQResign.sh同一目录下地log.txt，里面有详细的日志输出。
 
-##（3）错误提示
+## (3)错误提示
 ### 1."该文件夹中包含多个ipa，请只放置一个需重签名的ipa":文件夹内没放或者放了多个ipa文件，导致无法读取ipa文件；解决办法：只留一个需重签名的ipa文件。
 
 ### 2."该文件夹中包含多个provisitionFile，请只放置一个需重签名的provisitionFile"：同上
